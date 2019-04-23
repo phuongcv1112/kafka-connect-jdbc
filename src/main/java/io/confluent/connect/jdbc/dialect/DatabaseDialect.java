@@ -290,7 +290,8 @@ public interface DatabaseDialect extends ConnectionProvider {
   );
 
   /**
-   * Create a criteria generator for queries that look for changed data using system transaction column
+   * Create a criteria generator for queries that look for changed data using
+   * system transaction column
    * @return the {@link SystemTransactionCriteria} implementation; never null
    */
   SystemTransactionCriteria criteriaFor(ColumnId systemTransactionColumnNames);

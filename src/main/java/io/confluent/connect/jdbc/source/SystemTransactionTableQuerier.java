@@ -30,7 +30,7 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.Map;
 
 
 /**
@@ -61,8 +61,7 @@ public class SystemTransactionTableQuerier extends TableQuerier implements Crite
   public SystemTransactionTableQuerier(DatabaseDialect dialect, QueryMode mode, String name,
                                        String topicPrefix,
                                        String systemTransactionColumnName,
-                                       Map<String, Object> offsetMap
-                                      ) {
+                                       Map<String, Object> offsetMap) {
     super(dialect, mode, name, topicPrefix);
     this.systemTransactionColumnName = systemTransactionColumnName;
     this.offset = SystemTransactionOffset.fromMap(offsetMap);
@@ -74,7 +73,8 @@ public class SystemTransactionTableQuerier extends TableQuerier implements Crite
         partition = OffsetProtocols.sourcePartitionForProtocolV1(tableId);
         break;
       case QUERY:
-        throw new ConnectException("Query mode not supported with system transaction table querier");
+        throw new ConnectException(
+                "Query mode not supported with system transaction table querier");
       default:
         throw new ConnectException("Unexpected query mode: " + mode);
     }
@@ -83,7 +83,7 @@ public class SystemTransactionTableQuerier extends TableQuerier implements Crite
 
   @Override
   protected void createPreparedStatement(Connection db) throws SQLException {
-//    findDefaultAutoIncrementingColumn(db);
+    //    findDefaultAutoIncrementingColumn(db);
 
     ColumnId systemTransactionColumn = new ColumnId(tableId, systemTransactionColumnName);
 
@@ -94,7 +94,8 @@ public class SystemTransactionTableQuerier extends TableQuerier implements Crite
         builder.append(tableId);
         break;
       case QUERY:
-        throw new ConnectException("Query mode not supported with system transaction table querier");
+        throw new ConnectException(
+                "Query mode not supported with system transaction table querier");
       default:
         throw new ConnectException("Unknown mode encountered when preparing query: " + mode);
     }

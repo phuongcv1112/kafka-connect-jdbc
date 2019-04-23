@@ -51,11 +51,11 @@ public class SystemTransactionCriteria {
   protected final String convertedSystemTransactionColumnName;
 
 
-  public SystemTransactionCriteria(
-        ColumnId systemTransactionColumn
-  ) {
-      this.systemTransactionColumn = systemTransactionColumn;
-      this.convertedSystemTransactionColumnName = new StringBuilder().append(this.systemTransactionColumn.name()).append("::text::bigint").toString();
+  public SystemTransactionCriteria(ColumnId systemTransactionColumn) {
+    this.systemTransactionColumn = systemTransactionColumn;
+    this.convertedSystemTransactionColumnName = new StringBuilder()
+            .append(this.systemTransactionColumn.name())
+            .append("::text::bigint").toString();
   }
 
   /**
@@ -124,19 +124,22 @@ public class SystemTransactionCriteria {
           Struct record
   ) {
     final Long extractedId;
-    final Schema systemTransactionColumnSchema = schema.field(systemTransactionColumn.name()).schema();
+    final Schema systemTransactionColumnSchema = schema.field(systemTransactionColumn.name())
+                                                       .schema();
     final Object systemTransactionColumnValue = record.get(systemTransactionColumn.name());
     if (systemTransactionColumnValue == null) {
       throw new ConnectException(
-              "Null value for system transaction column of type: " + systemTransactionColumnSchema.type());
+              "Null value for system transaction column of type: "
+                      + systemTransactionColumnSchema.type());
     } else if (isIntegralPrimitiveType(systemTransactionColumnValue)) {
       extractedId = ((Number) systemTransactionColumnValue).longValue();
-    } else if (systemTransactionColumnSchema.name() != null && systemTransactionColumnSchema.name().equals(
-            Decimal.LOGICAL_NAME)) {
+    } else if (systemTransactionColumnSchema.name() != null
+            && systemTransactionColumnSchema.name().equals(Decimal.LOGICAL_NAME)) {
       extractedId = extractDecimalId(systemTransactionColumnValue);
     } else {
       throw new ConnectException(
-              "Invalid type for system transaction column: " + systemTransactionColumnSchema.type());
+              "Invalid type for system transaction column: "
+                      + systemTransactionColumnSchema.type());
     }
     log.trace("Extracted system transaction column value: {}", extractedId);
     return extractedId;
@@ -145,7 +148,8 @@ public class SystemTransactionCriteria {
   protected Long extractDecimalId(Object incrementingColumnValue) {
     final BigDecimal decimal = ((BigDecimal) incrementingColumnValue);
     if (decimal.compareTo(LONG_MAX_VALUE_AS_BIGDEC) > 0) {
-      throw new ConnectException("Decimal value for system transaction column exceeded Long.MAX_VALUE");
+      throw new ConnectException(
+              "Decimal value for system transaction column exceeded Long.MAX_VALUE");
     }
     if (decimal.scale() != 0) {
       throw new ConnectException("Scale of Decimal value for system transaction column must be 0");
