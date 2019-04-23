@@ -17,6 +17,8 @@ package io.confluent.connect.jdbc.dialect;
 
 import java.time.ZoneOffset;
 import java.util.TimeZone;
+
+import io.confluent.connect.jdbc.source.*;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.types.Password;
 import org.apache.kafka.connect.data.Date;
@@ -71,11 +73,7 @@ import io.confluent.connect.jdbc.sink.PreparedStatementBinder;
 import io.confluent.connect.jdbc.sink.metadata.FieldsMetadata;
 import io.confluent.connect.jdbc.sink.metadata.SchemaPair;
 import io.confluent.connect.jdbc.sink.metadata.SinkRecordField;
-import io.confluent.connect.jdbc.source.ColumnMapping;
-import io.confluent.connect.jdbc.source.JdbcSourceConnectorConfig;
 import io.confluent.connect.jdbc.source.JdbcSourceConnectorConfig.NumericMapping;
-import io.confluent.connect.jdbc.source.JdbcSourceTaskConfig;
-import io.confluent.connect.jdbc.source.TimestampIncrementingCriteria;
 import io.confluent.connect.jdbc.util.ColumnDefinition;
 import io.confluent.connect.jdbc.util.ColumnDefinition.Mutability;
 import io.confluent.connect.jdbc.util.ColumnDefinition.Nullability;
@@ -833,6 +831,13 @@ public class GenericDatabaseDialect implements DatabaseDialect {
       List<ColumnId> timestampColumns
   ) {
     return new TimestampIncrementingCriteria(incrementingColumn, timestampColumns, timeZone);
+  }
+
+  @Override
+  public SystemTransactionCriteria criteriaFor(
+          ColumnId systemTransactionColumn
+  ) {
+    return new SystemTransactionCriteria(systemTransactionColumn);
   }
 
   /**

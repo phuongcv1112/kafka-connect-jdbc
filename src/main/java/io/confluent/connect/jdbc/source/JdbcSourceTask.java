@@ -249,8 +249,8 @@ public class JdbcSourceTask extends SourceTask {
                 queryMode,
                 tableOrQuery,
                 topicPrefix,
-                offset,
-                timestampDelayInterval
+                "xmin",
+                offset
             )
         );
       }
