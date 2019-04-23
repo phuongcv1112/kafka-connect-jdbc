@@ -41,7 +41,7 @@ public class SystemTransactionOffset {
   }
 
   public Map<String, Object> toMap() {
-    Map<String, Object> map = new HashMap<>(3);
+    Map<String, Object> map = new HashMap<>(1);
     if (incrementingOffset != null) {
       map.put(INCREMENTING_FIELD, incrementingOffset);
     }
