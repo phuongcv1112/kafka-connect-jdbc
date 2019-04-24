@@ -167,7 +167,7 @@ public class SystemTransactionCriteria {
     builder.append(convertedSystemTransactionColumnName);
     builder.append(" > ?");
     builder.append(" ORDER BY ");
-    builder.append(systemTransactionColumn);
+    builder.append(convertedSystemTransactionColumnName);
     builder.append(" ASC");
   }
 

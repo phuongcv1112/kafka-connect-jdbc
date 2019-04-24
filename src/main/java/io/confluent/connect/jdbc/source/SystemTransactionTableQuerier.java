@@ -90,7 +90,7 @@ public class SystemTransactionTableQuerier extends TableQuerier implements Crite
     ExpressionBuilder builder = dialect.expressionBuilder();
     switch (mode) {
       case TABLE:
-        builder.append("SELECT * FROM ");
+        builder.append("SELECT xmin::text::bigint as xmin,* FROM ");
         builder.append(tableId);
         break;
       case QUERY:
