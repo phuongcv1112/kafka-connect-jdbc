@@ -140,7 +140,11 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
       + "monotonically incrementing, but not necessarily unique.\n"
       + "  * timestamp+incrementing - use two columns, a timestamp column that detects new and "
       + "modified rows and a strictly incrementing column which provides a globally unique ID for "
-      + "updates so each row can be assigned a unique stream offset.";
+      + "updates so each row can be assigned a unique stream offset.\n"
+      + "  * system_transaction - use a system transaction columnn (xmin) to detect new and"
+      + "modified rows. Note that this will not detect deletions of existing rows. \n"
+      + "Currently only apply for postgresql";
+
   private static final String MODE_DISPLAY = "Table Loading Mode";
 
   public static final String MODE_UNSPECIFIED = "";
@@ -148,6 +152,7 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
   public static final String MODE_TIMESTAMP = "timestamp";
   public static final String MODE_INCREMENTING = "incrementing";
   public static final String MODE_TIMESTAMP_INCREMENTING = "timestamp+incrementing";
+  public static final String MODE_SYSTEM_TRANSACTION = "system_transaction";
 
   public static final String INCREMENTING_COLUMN_NAME_CONFIG = "incrementing.column.name";
   private static final String INCREMENTING_COLUMN_NAME_DOC =
@@ -437,7 +442,8 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
             MODE_BULK,
             MODE_TIMESTAMP,
             MODE_INCREMENTING,
-            MODE_TIMESTAMP_INCREMENTING
+            MODE_TIMESTAMP_INCREMENTING,
+            MODE_SYSTEM_TRANSACTION
         ),
         Importance.HIGH,
         MODE_DOC,
@@ -695,22 +701,19 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
     @Override
     public boolean visible(String name, Map<String, Object> config) {
       String mode = (String) config.get(MODE_CONFIG);
-      switch (mode) {
-        case MODE_BULK:
-          return false;
-        case MODE_TIMESTAMP:
-          return name.equals(TIMESTAMP_COLUMN_NAME_CONFIG) || name.equals(VALIDATE_NON_NULL_CONFIG);
-        case MODE_INCREMENTING:
-          return name.equals(INCREMENTING_COLUMN_NAME_CONFIG)
-                 || name.equals(VALIDATE_NON_NULL_CONFIG);
-        case MODE_TIMESTAMP_INCREMENTING:
-          return name.equals(TIMESTAMP_COLUMN_NAME_CONFIG)
-                 || name.equals(INCREMENTING_COLUMN_NAME_CONFIG)
-                 || name.equals(VALIDATE_NON_NULL_CONFIG);
-        case MODE_UNSPECIFIED:
-          throw new ConfigException("Query mode must be specified");
-        default:
-          throw new ConfigException("Invalid mode: " + mode);
+      if (mode.equals(MODE_BULK) || mode.equals(MODE_SYSTEM_TRANSACTION)) {
+        return false;
+      } else if (mode.equals(MODE_TIMESTAMP)) {
+        return name.equals(TIMESTAMP_COLUMN_NAME_CONFIG) || name.equals(VALIDATE_NON_NULL_CONFIG);
+      } else if (mode.equals(MODE_INCREMENTING)) {
+        return name.equals(INCREMENTING_COLUMN_NAME_CONFIG)
+                || name.equals(VALIDATE_NON_NULL_CONFIG);
+      } else if (mode.equals(MODE_TIMESTAMP_INCREMENTING)) {
+        return name.equals(TIMESTAMP_COLUMN_NAME_CONFIG)
+                || name.equals(INCREMENTING_COLUMN_NAME_CONFIG)
+                || name.equals(VALIDATE_NON_NULL_CONFIG);
+      } else {
+        throw new ConfigException("Query mode must be specified or invalid");
       }
     }
   }

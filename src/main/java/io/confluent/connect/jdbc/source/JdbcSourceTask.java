@@ -115,7 +115,8 @@ public class JdbcSourceTask extends SourceTask {
     Map<Map<String, String>, Map<String, Object>> offsets = null;
     if (mode.equals(JdbcSourceTaskConfig.MODE_INCREMENTING)
         || mode.equals(JdbcSourceTaskConfig.MODE_TIMESTAMP)
-        || mode.equals(JdbcSourceTaskConfig.MODE_TIMESTAMP_INCREMENTING)) {
+        || mode.equals(JdbcSourceTaskConfig.MODE_TIMESTAMP_INCREMENTING)
+        || mode.equals(JdbcSourceTaskConfig.MODE_SYSTEM_TRANSACTION)) {
       List<Map<String, String>> partitions = new ArrayList<>(tables.size());
       switch (queryMode) {
         case TABLE:
@@ -156,12 +157,15 @@ public class JdbcSourceTask extends SourceTask {
       switch (queryMode) {
         case TABLE:
           if (validateNonNulls) {
-            validateNonNullable(
-                mode,
-                tableOrQuery,
-                incrementingColumn,
-                timestampColumns
-            );
+            if (!mode.equals(JdbcSourceTaskConfig.MODE_SYSTEM_TRANSACTION)) {
+              validateNonNullable(
+                      mode,
+                      tableOrQuery,
+                      incrementingColumn,
+                      timestampColumns
+              );
+            }
+
           }
           tablePartitionsToCheck = partitionsByTableFqn.get(tableOrQuery);
           break;
@@ -236,6 +240,17 @@ public class JdbcSourceTask extends SourceTask {
                 offset,
                 timestampDelayInterval,
                 timeZone
+            )
+        );
+      } else if (mode.endsWith(JdbcSourceTaskConfig.MODE_SYSTEM_TRANSACTION)) {
+        tableQueue.add(
+            new SystemTransactionTableQuerier(
+                dialect,
+                queryMode,
+                tableOrQuery,
+                topicPrefix,
+                "xmin",
+                offset
             )
         );
       }
