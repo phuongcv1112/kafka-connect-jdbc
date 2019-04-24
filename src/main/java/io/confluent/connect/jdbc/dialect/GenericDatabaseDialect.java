@@ -18,11 +18,6 @@ package io.confluent.connect.jdbc.dialect;
 import java.time.ZoneOffset;
 import java.util.TimeZone;
 
-import io.confluent.connect.jdbc.source.ColumnMapping;
-import io.confluent.connect.jdbc.source.JdbcSourceConnectorConfig;
-import io.confluent.connect.jdbc.source.JdbcSourceTaskConfig;
-import io.confluent.connect.jdbc.source.TimestampIncrementingCriteria;
-import io.confluent.connect.jdbc.source.SystemTransactionCriteria;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.types.Password;
 import org.apache.kafka.connect.data.Date;
@@ -70,6 +65,11 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicReference;
 
 import io.confluent.connect.jdbc.dialect.DatabaseDialectProvider.FixedScoreProvider;
+import io.confluent.connect.jdbc.source.ColumnMapping;
+import io.confluent.connect.jdbc.source.JdbcSourceConnectorConfig;
+import io.confluent.connect.jdbc.source.JdbcSourceTaskConfig;
+import io.confluent.connect.jdbc.source.TimestampIncrementingCriteria;
+import io.confluent.connect.jdbc.source.SystemTransactionCriteria;
 import io.confluent.connect.jdbc.sink.JdbcSinkConfig;
 import io.confluent.connect.jdbc.sink.JdbcSinkConfig.InsertMode;
 import io.confluent.connect.jdbc.sink.JdbcSinkConfig.PrimaryKeyMode;

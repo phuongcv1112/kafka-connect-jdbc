@@ -31,7 +31,8 @@ import java.util.TimeZone;
 import static org.junit.Assert.assertEquals;
 
 public class SystemTransactionCriteriaTest {
-
+  // Since system transaction column is a incrementing value like id  (after convert, not monothlic)
+  // below test cases are almost like testcases of incrementing mode
   private static final TableId TABLE_ID = new TableId(null, null,"myTable");
   private static final ColumnId INCREMENTING_COLUMN = new ColumnId(TABLE_ID, "id");
 

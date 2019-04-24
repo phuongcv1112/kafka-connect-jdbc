@@ -36,7 +36,7 @@ import java.util.Map;
 /**
  * <p>
  *   SystemTransactionTableQuerier performs incremental loading of data using main mechanisms:
- *   a system transaction column provided monotonically incrementing values that can be used to
+ *   a system transaction column provided incrementing values that can be used to
  *   detect new or modified rows.
  * </p>
  *
@@ -83,14 +83,16 @@ public class SystemTransactionTableQuerier extends TableQuerier implements Crite
 
   @Override
   protected void createPreparedStatement(Connection db) throws SQLException {
-    //    findDefaultAutoIncrementingColumn(db);
-
     ColumnId systemTransactionColumn = new ColumnId(tableId, systemTransactionColumnName);
 
     ExpressionBuilder builder = dialect.expressionBuilder();
     switch (mode) {
       case TABLE:
-        builder.append("SELECT xmin::text::bigint as xmin,* FROM ");
+        builder.append("SELECT ");
+        builder.append(systemTransactionColumnName);
+        builder.append("::text::bigint as ");
+        builder.append(systemTransactionColumnName);
+        builder.append(",* FROM ");
         builder.append(tableId);
         break;
       case QUERY:

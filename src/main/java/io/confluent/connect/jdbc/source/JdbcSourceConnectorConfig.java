@@ -142,7 +142,8 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
       + "modified rows and a strictly incrementing column which provides a globally unique ID for "
       + "updates so each row can be assigned a unique stream offset.\n"
       + "  * system_transaction - use a system transaction columnn (xmin) to detect new and"
-      + "modified rows. Note that this will not detect deletions of existing rows.";
+      + "modified rows. Note that this will not detect deletions of existing rows. \n"
+      + "Currently only apply for postgresql";
 
   private static final String MODE_DISPLAY = "Table Loading Mode";
 
