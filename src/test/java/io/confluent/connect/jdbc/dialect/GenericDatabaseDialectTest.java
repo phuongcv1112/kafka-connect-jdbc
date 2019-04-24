@@ -1,16 +1,17 @@
-/**
- * Copyright 2017 Confluent Inc.
+/*
+ * Copyright 2018 Confluent Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
+ * Licensed under the Confluent Community License (the "License"); you may not use
+ * this file except in compliance with the License.  You may obtain a copy of the
+ * License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.confluent.io/confluent-community-license
  *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
- **/
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OF ANY KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations under the License.
+ */
 
 package io.confluent.connect.jdbc.dialect;
 
@@ -47,6 +48,7 @@ import io.confluent.connect.jdbc.util.ColumnId;
 import io.confluent.connect.jdbc.util.ConnectionProvider;
 import io.confluent.connect.jdbc.util.ExpressionBuilder;
 import io.confluent.connect.jdbc.util.IdentifierRules;
+import io.confluent.connect.jdbc.util.QuoteMethod;
 import io.confluent.connect.jdbc.util.StringUtils;
 import io.confluent.connect.jdbc.util.TableDefinition;
 import io.confluent.connect.jdbc.util.TableId;
@@ -259,7 +261,6 @@ public class GenericDatabaseDialectTest extends BaseDialectTest<GenericDatabaseD
     ColumnId bar = new ColumnId(test, "bar");
     Map<ColumnId, ColumnDefinition> defns = dialect
         .describeColumns(db.getConnection(), "test", null);
-    System.out.println("defns = " + defns);
     assertTrue(defns.get(id).isAutoIncrement());
     assertFalse(defns.get(bar).isAutoIncrement());
     assertFalse(defns.get(id).isOptional());
@@ -354,6 +355,9 @@ public class GenericDatabaseDialectTest extends BaseDialectTest<GenericDatabaseD
   private void verifyWriteColumnSpec(String expected, SinkRecordField field) {
     GenericDatabaseDialect dialect = dummyDialect();
     ExpressionBuilder builder = dialect.expressionBuilder();
+    if (quoteIdentfiiers != null) {
+      builder.setQuoteIdentifiers(quoteIdentfiiers);
+    }
     dialect.writeColumnSpec(builder, field);
     assertEquals(expected, builder.toString());
   }
@@ -374,10 +378,31 @@ public class GenericDatabaseDialectTest extends BaseDialectTest<GenericDatabaseD
         SchemaBuilder.int32().defaultValue(42).build(), "foo", true));
     verifyWriteColumnSpec("\"foo\" DUMMY DEFAULT 42", new SinkRecordField(SchemaBuilder.int32().defaultValue(42).build(), "foo", false));
     verifyWriteColumnSpec("\"foo\" DUMMY DEFAULT 42", new SinkRecordField(SchemaBuilder.int32().optional().defaultValue(42).build(), "foo", true));
-    verifyWriteColumnSpec("\"foo\" DUMMY DEFAULT 42", new SinkRecordField(SchemaBuilder.int32().optional().defaultValue(42).build(), "foo", false));
-    verifyWriteColumnSpec("\"foo\" DUMMY NOT NULL", new SinkRecordField(Schema.INT32_SCHEMA, "foo", true));
-    verifyWriteColumnSpec("\"foo\" DUMMY NOT NULL", new SinkRecordField(Schema.INT32_SCHEMA, "foo", false));
-    verifyWriteColumnSpec("\"foo\" DUMMY NOT NULL", new SinkRecordField(Schema.OPTIONAL_INT32_SCHEMA, "foo", true));
-    verifyWriteColumnSpec("\"foo\" DUMMY NULL", new SinkRecordField(Schema.OPTIONAL_INT32_SCHEMA, "foo", false));
+
+    quoteIdentfiiers = QuoteMethod.NEVER;
+    verifyWriteColumnSpec("foo DUMMY DEFAULT 42", new SinkRecordField(SchemaBuilder.int32().optional().defaultValue(42).build(), "foo", false));
+    verifyWriteColumnSpec("foo DUMMY NOT NULL", new SinkRecordField(Schema.INT32_SCHEMA, "foo", true));
+    verifyWriteColumnSpec("foo DUMMY NOT NULL", new SinkRecordField(Schema.INT32_SCHEMA, "foo", false));
+    verifyWriteColumnSpec("foo DUMMY NOT NULL", new SinkRecordField(Schema.OPTIONAL_INT32_SCHEMA, "foo", true));
+    verifyWriteColumnSpec("foo DUMMY NULL", new SinkRecordField(Schema.OPTIONAL_INT32_SCHEMA, "foo", false));
+  }
+
+  @Test
+  public void shouldSanitizeUrlWithoutCredentialsInProperties() {
+    assertSanitizedUrl(
+        "jdbc:acme:db/foo:100?key1=value1&key2=value2&key3=value3&&other=value",
+        "jdbc:acme:db/foo:100?key1=value1&key2=value2&key3=value3&&other=value"
+
+    );
+  }
+
+  @Test
+  public void shouldSanitizeUrlWithCredentialsInUrlProperties() {
+    assertSanitizedUrl(
+        "jdbc:acme:db/foo:100?password=secret&key1=value1&key2=value2&key3=value3&"
+        + "user=smith&password=secret&other=value",
+        "jdbc:acme:db/foo:100?password=****&key1=value1&key2=value2&key3=value3&"
+        + "user=smith&password=****&other=value"
+    );
   }
 }

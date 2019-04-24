@@ -1,17 +1,16 @@
 /*
- * Copyright 2016 Confluent Inc.
+ * Copyright 2018 Confluent Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Confluent Community License (the "License"); you may not use
+ * this file except in compliance with the License.  You may obtain a copy of the
+ * License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.confluent.io/confluent-community-license
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OF ANY KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations under the License.
  */
 
 package io.confluent.connect.jdbc.sink;
@@ -112,6 +111,8 @@ public class BufferedRecords {
       // Continue with current batch state
       records.add(record);
       if (records.size() >= config.batchSize) {
+        log.debug("Flushing buffered records after exceeding configured batch size {}.",
+            config.batchSize);
         flushed = flush();
       } else {
         flushed = Collections.emptyList();
@@ -119,6 +120,8 @@ public class BufferedRecords {
     } else {
       // Each batch needs to have the same SchemaPair, so get the buffered records out, reset
       // state and re-attempt the add
+      log.debug("Flushing buffered records after due to unequal schema pairs: "
+          + "current schemas: {}, next schemas: {}", currentSchemaPair, schemaPair);
       flushed = flush();
       currentSchemaPair = null;
       flushed.addAll(add(record));
@@ -128,8 +131,10 @@ public class BufferedRecords {
 
   public List<SinkRecord> flush() throws SQLException {
     if (records.isEmpty()) {
+      log.debug("Records is empty");
       return new ArrayList<>();
     }
+    log.debug("Flushing {} buffered records", records.size());
     for (SinkRecord record : records) {
       preparedStatementBinder.bindRecord(record);
     }
@@ -152,7 +157,7 @@ public class BufferedRecords {
           ));
         case UPSERT:
         case UPDATE:
-          log.trace(
+          log.debug(
               "{} records:{} resulting in in totalUpdateCount:{}",
               config.insertMode,
               records.size(),
@@ -177,6 +182,7 @@ public class BufferedRecords {
   }
 
   public void close() throws SQLException {
+    log.info("Closing BufferedRecords with preparedStatement: {}", preparedStatement);
     if (preparedStatement != null) {
       preparedStatement.close();
       preparedStatement = null;

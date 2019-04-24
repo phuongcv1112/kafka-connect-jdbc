@@ -1,20 +1,40 @@
-/**
- * Copyright 2015 Confluent Inc.
+/*
+ * Copyright 2018 Confluent Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Confluent Community License (the "License"); you may not use
+ * this file except in compliance with the License.  You may obtain a copy of the
+ * License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.confluent.io/confluent-community-license
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- **/
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OF ANY KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations under the License.
+ */
 
 package io.confluent.connect.jdbc.source;
+
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.time.ZoneId;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.TimeZone;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+import io.confluent.connect.jdbc.dialect.DatabaseDialect;
+import io.confluent.connect.jdbc.dialect.DatabaseDialects;
+import io.confluent.connect.jdbc.util.DatabaseDialectRecommender;
+import io.confluent.connect.jdbc.util.EnumRecommender;
+import io.confluent.connect.jdbc.util.QuoteMethod;
+import io.confluent.connect.jdbc.util.TableId;
+import io.confluent.connect.jdbc.util.TimeZoneValidator;
 
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
@@ -26,25 +46,6 @@ import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.utils.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-
-import io.confluent.connect.jdbc.dialect.DatabaseDialect;
-import io.confluent.connect.jdbc.dialect.DatabaseDialects;
-import io.confluent.connect.jdbc.util.DatabaseDialectRecommender;
-import io.confluent.connect.jdbc.util.TableId;
 
 public class JdbcSourceConnectorConfig extends AbstractConfig {
 
@@ -239,6 +240,23 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
       + " from the last time we fetched until current time minus the delay.";
   public static final long TIMESTAMP_DELAY_INTERVAL_MS_DEFAULT = 0;
   private static final String TIMESTAMP_DELAY_INTERVAL_MS_DISPLAY = "Delay Interval (ms)";
+
+  public static final String DB_TIMEZONE_CONFIG = "db.timezone";
+  public static final String DB_TIMEZONE_DEFAULT = "UTC";
+  private static final String DB_TIMEZONE_CONFIG_DOC =
+      "Name of the JDBC timezone that should be used in the connector when "
+      + "querying with time-based criteria. Defaults to UTC.";
+  private static final String DB_TIMEZONE_CONFIG_DISPLAY = "DB time zone";
+
+  public static final String QUOTE_SQL_IDENTIFIERS_CONFIG = "quote.sql.identifiers";
+  public static final String QUOTE_SQL_IDENTIFIERS_DEFAULT = QuoteMethod.ALWAYS.name().toString();
+  public static final String QUOTE_SQL_IDENTIFIERS_DOC =
+      "When to quote table names, column names, and other identifiers in SQL statements. "
+      + "For backward compatibility, the default is 'always'.";
+  public static final String QUOTE_SQL_IDENTIFIERS_DISPLAY = "Quote Identifiers";
+
+  private static final EnumRecommender QUOTE_METHOD_RECOMMENDER =
+      EnumRecommender.in(QuoteMethod.values());
 
   public static final String DATABASE_GROUP = "Database";
   public static final String MODE_GROUP = "Mode";
@@ -474,7 +492,18 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
         MODE_GROUP,
         ++orderInGroup,
         Width.SHORT,
-        QUERY_DISPLAY);
+        QUERY_DISPLAY
+    ).define(
+        QUOTE_SQL_IDENTIFIERS_CONFIG,
+        Type.STRING,
+        QUOTE_SQL_IDENTIFIERS_DEFAULT,
+        Importance.MEDIUM,
+        QUOTE_SQL_IDENTIFIERS_DOC,
+        MODE_GROUP,
+        ++orderInGroup,
+        Width.MEDIUM,
+        QUOTE_SQL_IDENTIFIERS_DISPLAY,
+        QUOTE_METHOD_RECOMMENDER);
   }
 
   private static final void addConnectorOptions(ConfigDef config) {
@@ -537,7 +566,18 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
         CONNECTOR_GROUP,
         ++orderInGroup,
         Width.MEDIUM,
-        TIMESTAMP_DELAY_INTERVAL_MS_DISPLAY);
+        TIMESTAMP_DELAY_INTERVAL_MS_DISPLAY
+    ).define(
+        DB_TIMEZONE_CONFIG,
+        Type.STRING,
+        DB_TIMEZONE_DEFAULT,
+        TimeZoneValidator.INSTANCE,
+        Importance.MEDIUM,
+        DB_TIMEZONE_CONFIG_DOC,
+        CONNECTOR_GROUP,
+        ++orderInGroup,
+        Width.MEDIUM,
+        DB_TIMEZONE_CONFIG_DISPLAY);
   }
 
   public static final ConfigDef CONFIG_DEF = baseConfigDef();
@@ -705,59 +745,17 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
     }
   }
 
-  //Porting from JdbcSinkConfig and extending to implement Recommender interface too.
-  //TODO: Should factor out to common class.
-  private static class EnumRecommender implements ConfigDef.Validator, ConfigDef.Recommender {
-    private final List<String> canonicalValues;
-    private final Set<String> validValues;
-
-    private EnumRecommender(List<String> canonicalValues, Set<String> validValues) {
-      this.canonicalValues = canonicalValues;
-      this.validValues = validValues;
-    }
-
-    @SafeVarargs
-    public static <E> EnumRecommender in(E... enumerators) {
-      final List<String> canonicalValues = new ArrayList<>(enumerators.length);
-      final Set<String> validValues = new HashSet<>(enumerators.length * 2);
-      for (E e : enumerators) {
-        canonicalValues.add(e.toString().toLowerCase());
-        validValues.add(e.toString().toUpperCase(Locale.ROOT));
-        validValues.add(e.toString().toLowerCase(Locale.ROOT));
-      }
-      return new EnumRecommender(canonicalValues, validValues);
-    }
-
-    @Override
-    public void ensureValid(String key, Object value) {
-      // calling toString on itself because IDE complains if the Object is passed.
-      if (value != null && !validValues.contains(value.toString())) {
-        throw new ConfigException(key, value, "Invalid enumerator");
-      }
-    }
-
-    @Override
-    public String toString() {
-      return canonicalValues.toString();
-    }
-
-    @Override
-    public List<Object> validValues(String name, Map<String, Object> connectorConfigs) {
-      return new ArrayList<Object>(canonicalValues);
-    }
-
-    @Override
-    public boolean visible(String name, Map<String, Object> connectorConfigs) {
-      return true;
-    }
-  }
-
   protected JdbcSourceConnectorConfig(ConfigDef subclassConfigDef, Map<String, String> props) {
     super(subclassConfigDef, props);
   }
 
   public NumericMapping numericMapping() {
     return NumericMapping.get(this);
+  }
+
+  public TimeZone timeZone() {
+    String dbTimeZone = getString(JdbcSourceTaskConfig.DB_TIMEZONE_CONFIG);
+    return TimeZone.getTimeZone(ZoneId.of(dbTimeZone));
   }
 
   public static void main(String[] args) {

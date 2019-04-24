@@ -1,18 +1,17 @@
-/**
- * Copyright 2015 Confluent Inc.
+/*
+ * Copyright 2018 Confluent Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Confluent Community License (the "License"); you may not use
+ * this file except in compliance with the License.  You may obtain a copy of the
+ * License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.confluent.io/confluent-community-license
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- **/
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OF ANY KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations under the License.
+ */
 
 package io.confluent.connect.jdbc;
 
@@ -67,6 +66,7 @@ public class JdbcSourceConnector extends SourceConnector {
 
   @Override
   public void start(Map<String, String> properties) throws ConnectException {
+    log.info("Starting JDBC Source Connector");
     try {
       configProperties = properties;
       config = new JdbcSourceConnectorConfig(configProperties);
@@ -141,6 +141,7 @@ public class JdbcSourceConnector extends SourceConnector {
       Map<String, String> taskProps = new HashMap<>(configProperties);
       taskProps.put(JdbcSourceTaskConfig.TABLES_CONFIG, "");
       taskConfigs.add(taskProps);
+      log.trace("Task configs with no query");
       return taskConfigs;
     } else {
       List<TableId> currentTables = tableMonitorThread.tables();
@@ -154,6 +155,7 @@ public class JdbcSourceConnector extends SourceConnector {
         taskProps.put(JdbcSourceTaskConfig.TABLES_CONFIG, builder.toString());
         taskConfigs.add(taskProps);
       }
+      log.trace("Task configs with query: {}, tables: {}", taskConfigs, currentTables.toArray());
       return taskConfigs;
     }
   }

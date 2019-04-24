@@ -13,12 +13,29 @@
  * specific language governing permissions and limitations under the License.
  */
 
-package io.confluent.connect.jdbc.source;
+package io.confluent.connect.jdbc.util;
 
-public class JdbcSourceConnectorConstants {
-  public static final String TABLE_NAME_KEY = "table";
-  public static final String QUERY_NAME_KEY = "query";
-  public static final String QUERY_NAME_VALUE = "query";
-  public static final String OFFSET_PROTOCOL_VERSION_KEY = "protocol";
-  public static final String PROTOCOL_VERSION_ONE = "1";
+public enum QuoteMethod {
+  ALWAYS("always"),
+  NEVER("never");
+
+  public static QuoteMethod get(String name) {
+    for (QuoteMethod method : values()) {
+      if (method.toString().equalsIgnoreCase(name)) {
+        return method;
+      }
+    }
+    throw new IllegalArgumentException("No matching QuoteMethod found for '" + name + "'");
+  }
+
+  private final String name;
+
+  QuoteMethod(String name) {
+    this.name = name;
+  }
+
+  @Override
+  public String toString() {
+    return name;
+  }
 }

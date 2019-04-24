@@ -1,21 +1,22 @@
 /*
  * Copyright 2018 Confluent Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Confluent Community License (the "License"); you may not use
+ * this file except in compliance with the License.  You may obtain a copy of the
+ * License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.confluent.io/confluent-community-license
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OF ANY KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations under the License.
  */
 
 package io.confluent.connect.jdbc.dialect;
 
+import java.time.ZoneOffset;
+import java.util.TimeZone;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.types.Password;
 import org.apache.kafka.connect.data.Date;
@@ -84,6 +85,7 @@ import io.confluent.connect.jdbc.util.ExpressionBuilder;
 import io.confluent.connect.jdbc.util.ExpressionBuilder.Transform;
 import io.confluent.connect.jdbc.util.IdentifierRules;
 import io.confluent.connect.jdbc.util.JdbcDriverInfo;
+import io.confluent.connect.jdbc.util.QuoteMethod;
 import io.confluent.connect.jdbc.util.TableDefinition;
 import io.confluent.connect.jdbc.util.TableId;
 
@@ -128,10 +130,12 @@ public class GenericDatabaseDialect implements DatabaseDialect {
   protected final String schemaPattern;
   protected final Set<String> tableTypes;
   protected final String jdbcUrl;
+  private final QuoteMethod quoteSqlIdentifiers;
   private final IdentifierRules defaultIdentifierRules;
   private final AtomicReference<IdentifierRules> identifierRules = new AtomicReference<>();
   private final Queue<Connection> connections = new ConcurrentLinkedQueue<>();
   private volatile JdbcDriverInfo jdbcDriverInfo;
+  private final TimeZone timeZone;
 
   /**
    * Create a new dialect instance with the given connector configuration.
@@ -160,15 +164,29 @@ public class GenericDatabaseDialect implements DatabaseDialect {
       catalogPattern = JdbcSourceTaskConfig.CATALOG_PATTERN_DEFAULT;
       schemaPattern = JdbcSourceTaskConfig.SCHEMA_PATTERN_DEFAULT;
       tableTypes = new HashSet<>(Arrays.asList(JdbcSourceTaskConfig.TABLE_TYPE_DEFAULT));
+      quoteSqlIdentifiers = QuoteMethod.get(
+          config.getString(JdbcSinkConfig.QUOTE_SQL_IDENTIFIERS_CONFIG)
+      );
     } else {
       catalogPattern = config.getString(JdbcSourceTaskConfig.CATALOG_PATTERN_CONFIG);
       schemaPattern = config.getString(JdbcSourceTaskConfig.SCHEMA_PATTERN_CONFIG);
       tableTypes = new HashSet<>(config.getList(JdbcSourceTaskConfig.TABLE_TYPE_CONFIG));
+      quoteSqlIdentifiers = QuoteMethod.get(
+          config.getString(JdbcSourceConnectorConfig.QUOTE_SQL_IDENTIFIERS_CONFIG)
+      );
     }
     if (config instanceof JdbcSourceConnectorConfig) {
       mapNumerics = ((JdbcSourceConnectorConfig)config).numericMapping();
     } else {
       mapNumerics = NumericMapping.NONE;
+    }
+
+    if (config instanceof JdbcSourceConnectorConfig) {
+      timeZone = ((JdbcSourceConnectorConfig) config).timeZone();
+    } else if (config instanceof JdbcSinkConfig) {
+      timeZone = ((JdbcSinkConfig) config).timeZone;
+    } else {
+      timeZone = TimeZone.getTimeZone(ZoneOffset.UTC);
     }
   }
 
@@ -440,7 +458,8 @@ public class GenericDatabaseDialect implements DatabaseDialect {
 
   @Override
   public ExpressionBuilder expressionBuilder() {
-    return identifierRules().expressionBuilder();
+    return identifierRules().expressionBuilder()
+                            .setQuoteIdentifiers(quoteSqlIdentifiers);
   }
 
   /**
@@ -813,7 +832,7 @@ public class GenericDatabaseDialect implements DatabaseDialect {
       ColumnId incrementingColumn,
       List<ColumnId> timestampColumns
   ) {
-    return new TimestampIncrementingCriteria(incrementingColumn, timestampColumns);
+    return new TimestampIncrementingCriteria(incrementingColumn, timestampColumns, timeZone);
   }
 
   /**
@@ -859,7 +878,7 @@ public class GenericDatabaseDialect implements DatabaseDialect {
     int scale = columnDefn.scale();
     switch (sqlType) {
       case Types.NULL: {
-        log.warn("JDBC type 'NULL' not currently supported for column '{}'", fieldName);
+        log.debug("JDBC type 'NULL' not currently supported for column '{}'", fieldName);
         return null;
       }
 
@@ -1198,19 +1217,19 @@ public class GenericDatabaseDialect implements DatabaseDialect {
         return rs -> rs.getBytes(col);
       }
 
-      // Date is day + moth + year
+      // Date is day + month + year
       case Types.DATE: {
-        return rs -> rs.getDate(col, DateTimeUtils.UTC_CALENDAR.get());
+        return rs -> rs.getDate(col, DateTimeUtils.getTimeZoneCalendar(timeZone));
       }
 
       // Time is a time of day -- hour, minute, seconds, nanoseconds
       case Types.TIME: {
-        return rs -> rs.getTime(col, DateTimeUtils.UTC_CALENDAR.get());
+        return rs -> rs.getTime(col, DateTimeUtils.getTimeZoneCalendar(timeZone));
       }
 
       // Timestamp is a date + time
       case Types.TIMESTAMP: {
-        return rs -> rs.getTimestamp(col, DateTimeUtils.UTC_CALENDAR.get());
+        return rs -> rs.getTimestamp(col, DateTimeUtils.getTimeZoneCalendar(timeZone));
       }
 
       // Datalink is basically a URL -> string
@@ -1365,7 +1384,7 @@ public class GenericDatabaseDialect implements DatabaseDialect {
     if (!keyColumns.isEmpty()) {
       builder.append(" WHERE ");
       builder.appendList()
-             .delimitedBy(", ")
+             .delimitedBy(" AND ")
              .transformedBy(ExpressionBuilder.columnNamesWith(" = ?"))
              .of(keyColumns);
     }
@@ -1479,7 +1498,7 @@ public class GenericDatabaseDialect implements DatabaseDialect {
           statement.setDate(
               index,
               new java.sql.Date(((java.util.Date) value).getTime()),
-              DateTimeUtils.UTC_CALENDAR.get()
+              DateTimeUtils.getTimeZoneCalendar(timeZone)
           );
           return true;
         case Decimal.LOGICAL_NAME:
@@ -1489,14 +1508,14 @@ public class GenericDatabaseDialect implements DatabaseDialect {
           statement.setTime(
               index,
               new java.sql.Time(((java.util.Date) value).getTime()),
-              DateTimeUtils.UTC_CALENDAR.get()
+              DateTimeUtils.getTimeZoneCalendar(timeZone)
           );
           return true;
         case org.apache.kafka.connect.data.Timestamp.LOGICAL_NAME:
           statement.setTimestamp(
               index,
               new java.sql.Timestamp(((java.util.Date) value).getTime()),
-              DateTimeUtils.UTC_CALENDAR.get()
+              DateTimeUtils.getTimeZoneCalendar(timeZone)
           );
           return true;
         default:
@@ -1601,7 +1620,7 @@ public class GenericDatabaseDialect implements DatabaseDialect {
       ExpressionBuilder builder,
       SinkRecordField f
   ) {
-    builder.appendIdentifierQuoted(f.name());
+    builder.appendColumnName(f.name());
     builder.append(" ");
     String sqlType = getSqlType(f);
     builder.append(sqlType);
@@ -1638,13 +1657,15 @@ public class GenericDatabaseDialect implements DatabaseDialect {
           builder.append(value);
           return;
         case Date.LOGICAL_NAME:
-          builder.appendStringQuoted(DateTimeUtils.formatUtcDate((java.util.Date) value));
+          builder.appendStringQuoted(DateTimeUtils.formatDate((java.util.Date) value, timeZone));
           return;
         case Time.LOGICAL_NAME:
-          builder.appendStringQuoted(DateTimeUtils.formatUtcTime((java.util.Date) value));
+          builder.appendStringQuoted(DateTimeUtils.formatTime((java.util.Date) value, timeZone));
           return;
         case org.apache.kafka.connect.data.Timestamp.LOGICAL_NAME:
-          builder.appendStringQuoted(DateTimeUtils.formatUtcTimestamp((java.util.Date) value));
+          builder.appendStringQuoted(
+              DateTimeUtils.formatTimestamp((java.util.Date) value, timeZone)
+          );
           return;
         default:
           // fall through to regular types
@@ -1689,6 +1710,22 @@ public class GenericDatabaseDialect implements DatabaseDialect {
         "%s (%s) type doesn't have a mapping to the SQL database column type", f.schemaName(),
         f.schemaType()
     ));
+  }
+
+  /**
+   * Return the sanitized form of the supplied JDBC URL, which masks any secrets or credentials.
+   *
+   * @param url the JDBC URL; may not be null
+   * @return the sanitized URL; never null
+   */
+  protected String sanitizedUrl(String url) {
+    // Only replace standard URL-type properties ...
+    return url.replaceAll("(?i)([?&]password=)[^&]*", "$1****");
+  }
+
+  @Override
+  public String identifier() {
+    return name() + " database " + sanitizedUrl(jdbcUrl);
   }
 
   @Override
