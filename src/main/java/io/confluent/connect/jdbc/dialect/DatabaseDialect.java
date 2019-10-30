@@ -32,6 +32,7 @@ import io.confluent.connect.jdbc.sink.metadata.FieldsMetadata;
 import io.confluent.connect.jdbc.sink.metadata.SchemaPair;
 import io.confluent.connect.jdbc.sink.metadata.SinkRecordField;
 import io.confluent.connect.jdbc.source.ColumnMapping;
+import io.confluent.connect.jdbc.source.SystemTransactionCriteria;
 import io.confluent.connect.jdbc.source.TimestampIncrementingCriteria;
 import io.confluent.connect.jdbc.util.ColumnDefinition;
 import io.confluent.connect.jdbc.util.ColumnId;
@@ -287,6 +288,13 @@ public interface DatabaseDialect extends ConnectionProvider {
       ColumnId incrementingColumn,
       List<ColumnId> timestampColumns
   );
+
+  /**
+   * Create a criteria generator for queries that look for changed data using
+   * system transaction column
+   * @return the {@link SystemTransactionCriteria} implementation; never null
+   */
+  SystemTransactionCriteria criteriaFor(ColumnId systemTransactionColumnNames);
 
   /**
    * Use the supplied {@link SchemaBuilder} to add a field that corresponds to the column with the

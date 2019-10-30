@@ -1,5 +1,6 @@
 # Build products
 target/
+lib/common/target/
 
 # IntelliJ data
 *.iml
