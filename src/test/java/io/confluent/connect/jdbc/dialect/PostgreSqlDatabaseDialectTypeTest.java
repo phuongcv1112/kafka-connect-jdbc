@@ -34,10 +34,8 @@ public class PostgreSqlDatabaseDialectTypeTest extends BaseDialectTest<PostgreSq
   protected static final TableId TABLE_ID = new TableId(null, null, "MyTable");
   protected static final ColumnId COLUMN_ID = new ColumnId(TABLE_ID, "columnA", "aliasA");
 
-
   protected static final String UUID_STRING = "c81d4e2e-bcf2-11e6-869b-7df92533d2db";
   protected static final UUID UUID_VALUE = UUID.fromString(UUID_STRING);
-
   protected static final String ARRAY_STRING = "{\"one two\",\"three four\"}";
   protected static final String[] ARRAY_VALUE = {"one two","three four"};
 
