@@ -61,6 +61,7 @@ public class PostgreSqlDatabaseDialect extends GenericDatabaseDialect {
 
   private static final String JSON_TYPE_NAME = "json";
   private static final String JSONB_TYPE_NAME = "jsonb";
+  private static final String UUID_TYPE_NAME = "uuid";
 
   /**
    * Create a new dialect instance with the given connector configuration.
@@ -116,10 +117,17 @@ public class PostgreSqlDatabaseDialect extends GenericDatabaseDialect {
         builder.field(fieldName, schema);
         return fieldName;
       }
+      case Types.ARRAY: {
+        builder.field(
+              fieldName,
+              columnDefn.isOptional() ? Schema.OPTIONAL_STRING_SCHEMA : Schema.STRING_SCHEMA
+        );
+        return fieldName;
+      }
       case Types.OTHER: {
         // Some of these types will have fixed size, but we drop this from the schema conversion
         // since only fixed byte arrays can have a fixed size
-        if (isJsonType(columnDefn)) {
+        if (isJsonType(columnDefn) || isUuidType(columnDefn)) {
           builder.field(
               fieldName,
               columnDefn.isOptional() ? Schema.OPTIONAL_STRING_SCHEMA : Schema.STRING_SCHEMA
@@ -157,8 +165,11 @@ public class PostgreSqlDatabaseDialect extends GenericDatabaseDialect {
         }
         return rs -> rs.getBytes(col);
       }
+      case Types.ARRAY: {
+        return rs -> rs.getString(col);
+      }
       case Types.OTHER: {
-        if (isJsonType(columnDefn)) {
+        if (isJsonType(columnDefn) || isUuidType(columnDefn)) {
           return rs -> rs.getString(col);
         }
         break;
@@ -174,6 +185,11 @@ public class PostgreSqlDatabaseDialect extends GenericDatabaseDialect {
   protected boolean isJsonType(ColumnDefinition columnDefn) {
     String typeName = columnDefn.typeName();
     return JSON_TYPE_NAME.equalsIgnoreCase(typeName) || JSONB_TYPE_NAME.equalsIgnoreCase(typeName);
+  }
+
+  protected boolean isUuidType(ColumnDefinition columnDefn) {
+    String typeName = columnDefn.typeName();
+    return UUID_TYPE_NAME.equals(typeName);
   }
 
   @Override

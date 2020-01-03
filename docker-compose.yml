@@ -13,7 +13,7 @@ services:
       - 9581-9585:9581-9585       # JMX Ports
       - 9092:9092                 # Kafka Broker
     volumes:
-      - ./target/kafka-connect-jdbc-5.3.0-SNAPSHOT-package/share/java:/opt/landoop/connectors/third-party/kafka-connect-postgres-source
+      - ./target/kafka-connect-jdbc-5.3.1-SNAPSHOT-package/share/java:/opt/landoop/connectors/third-party/kafka-connect-postgres-source
     links:
       - postgres
 
