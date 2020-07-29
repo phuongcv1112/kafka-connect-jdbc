@@ -62,6 +62,7 @@ public class PostgreSqlDatabaseDialect extends GenericDatabaseDialect {
   private static final String JSON_TYPE_NAME = "json";
   private static final String JSONB_TYPE_NAME = "jsonb";
   private static final String UUID_TYPE_NAME = "uuid";
+  private static final String CITEXT_TYPE_NAME = "citext";
 
   /**
    * Create a new dialect instance with the given connector configuration.
@@ -127,7 +128,7 @@ public class PostgreSqlDatabaseDialect extends GenericDatabaseDialect {
       case Types.OTHER: {
         // Some of these types will have fixed size, but we drop this from the schema conversion
         // since only fixed byte arrays can have a fixed size
-        if (isJsonType(columnDefn) || isUuidType(columnDefn)) {
+        if (isJsonType(columnDefn) || isUuidType(columnDefn) || isCitextType(columnDefn)) {
           builder.field(
               fieldName,
               columnDefn.isOptional() ? Schema.OPTIONAL_STRING_SCHEMA : Schema.STRING_SCHEMA
@@ -169,7 +170,7 @@ public class PostgreSqlDatabaseDialect extends GenericDatabaseDialect {
         return rs -> rs.getString(col);
       }
       case Types.OTHER: {
-        if (isJsonType(columnDefn) || isUuidType(columnDefn)) {
+        if (isJsonType(columnDefn) || isUuidType(columnDefn) || isCitextType(columnDefn)) {
           return rs -> rs.getString(col);
         }
         break;
@@ -190,6 +191,11 @@ public class PostgreSqlDatabaseDialect extends GenericDatabaseDialect {
   protected boolean isUuidType(ColumnDefinition columnDefn) {
     String typeName = columnDefn.typeName();
     return UUID_TYPE_NAME.equals(typeName);
+  }
+
+  protected boolean isCitextType(ColumnDefinition columnDefn) {
+    String typeName = columnDefn.typeName();
+    return CITEXT_TYPE_NAME.equals(typeName);
   }
 
   @Override
